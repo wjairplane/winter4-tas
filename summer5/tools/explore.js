@@ -13,12 +13,15 @@
 //  - Every time a beam reaches a new checkpoint, its leading line is saved as <out>_cp<k>_<config>.json,
 //    so a later search can resume from it: START=<inputs.json>[:frame] replays those inputs (up to
 //    frame, default all of them) and grows the search from there.
-// usage: [CONFIGS=a,b] [NK=4] [MAX_T=ms] [START=file[:frame]] node tools/explore.js [out=inputs/summer5_explore.json]
+//  - STOPCP=k makes collecting checkpoint k the goal instead of the finish (one section at a
+//    time); the result is the inputs up to the earliest arrival, and <out>.t holds that frame.
+// usage: [CONFIGS=a,b] [NK=4] [MAX_T=ms] [START=file[:frame]] [STOPCP=k] node tools/explore.js [out=inputs/summer5_explore.json]
 const { fork } = require('child_process'), fs = require('fs'), path = require('path');
 const { createSim, encodeRecording } = require('./sim.js');
 const NAME = { up: 'KeyW', right: 'KeyD', down: 'KeyS', left: 'KeyA' };
 const BIT = { up: 1, right: 2, down: 4, left: 8 };
 const MAX_T = +(process.env.MAX_T || 200000);   // game-time cap per line (ms)
+const STOPCP = +(process.env.STOPCP || 0);       // goal: collect this checkpoint (0 = finish)
 
 const CONFIGS = [
   { name: 'e40', BLOCK: 40, K: 160, CELL: 4, NOV: 6, ACTIONS: [1, 9, 3, 8, 2, 0, 4] },
@@ -125,7 +128,10 @@ async function child(cfg) {
     res.forEach((r, i) => {
       if (r.err) return;
       const nd = { id: r.cid, t: r.frames, pos: r.pos, cp: r.cp, speed: r.speed, parent: meta[i].parent, segs: meta[i].segs };
-      if (r.fin) { if (!bestFin || nd.t < bestFin.t) { bestFin = nd; process.send({ log: `[${cfg.name}] finish at ${nd.t} (step ${step})` }); } return; }
+      if (r.fin || (STOPCP && r.cp >= STOPCP)) {   // goal reached: keep the earliest arrival (faster one on a tie)
+        if (!bestFin || nd.t < bestFin.t || (nd.t === bestFin.t && nd.speed > bestFin.speed)) { bestFin = nd; process.send({ log: `[${cfg.name}] ${STOPCP ? 'checkpoint ' + STOPCP + ' reached' : 'finish'} at ${nd.t} (step ${step}, ${nd.speed.toFixed(0)} km/h)` }); }
+        return;
+      }
       if (r.pos[1] < -40) return;                                 // fell off the world
       const pp = nd.parent.pos, dt = Math.max(1, nd.t - nd.parent.t);
       const head = pp ? Math.round(Math.atan2(r.pos[0] - pp[0], r.pos[2] - pp[2]) / (Math.PI / 8)) : 0;
@@ -197,12 +203,15 @@ if (process.argv[2] === 'child') {
       if (!r.finish) { console.log(`${r.name}: no finish (max checkpoint ${r.maxCp ?? '?'})${r.error ? ' ' + r.error : ''}`); continue; }
       const L = { up: [], right: [], down: [], left: [], reset: [] }; const K2 = { KeyW: 'up', KeyD: 'right', KeyS: 'down', KeyA: 'left' };
       for (const [f, k] of r.events) L[K2[k]].push(f);
-      const v = await sim.run(encodeRecording(L), MAX_T + 10000);
-      console.log(`${r.name}: search finish ${r.finish}, clean re-simulation ${v.frames}`);
+      // re-check without snapshots: the finish via the game's recording path; a section goal by
+      // replaying until the checkpoint is collected
+      const v = STOPCP ? await (async () => { await sim.initFast(); const q = await sim.evalFrom(L, 0, MAX_T + 10000, 0, STOPCP); return { frames: q.cp >= STOPCP ? q.frames : Infinity }; })()
+        : await sim.run(encodeRecording(L), MAX_T + 10000);
+      console.log(`${r.name}: search ${STOPCP ? 'checkpoint ' + STOPCP : 'finish'} ${r.finish}, clean re-simulation ${v.frames}`);
       fs.writeFileSync(outFile.replace(/\.json$/, `_${r.name}.json`), JSON.stringify(r.events));
       if (!best || v.frames < best.frames) best = { ...r, frames: v.frames };
     }
-    if (best) { fs.writeFileSync(outFile, JSON.stringify(best.events)); console.log(`best: ${best.name} ${best.frames} -> ${outFile}`); }
+    if (best) { fs.writeFileSync(outFile, JSON.stringify(best.events)); fs.writeFileSync(outFile + '.t', String(best.frames)); console.log(`best: ${best.name} ${best.frames} -> ${outFile}`); }
     process.exit(0);
   })();
 }
