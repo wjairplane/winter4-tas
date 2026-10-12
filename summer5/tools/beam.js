@@ -39,7 +39,7 @@ const CONFIGS = [
 
 async function beamChild(cfg, refFile) {
   const { BLOCK, K, BIN_POS, BIN_DIR } = cfg;
-  const SPEED_H = cfg.SPEED_H ?? 60, DEAD_OFF = 12;
+  const SPEED_H = cfg.SPEED_H ?? 60, DEAD_OFF = +(process.env.BDEAD || 12);   // BDEAD: how far (m) a line may stray from the reference line
   const sim = await createSim(); await sim.initFast();
   const ref = load(refFile);
   const base = await sim.setBase(ref, 300000);
