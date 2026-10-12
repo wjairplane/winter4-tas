@@ -88,7 +88,9 @@ async function beamChild(cfg, refFile) {
     const startSegs = segsOf(clockBits, 0, BSTART);
     const { res } = await sim.raw({ op: 'bExpand', jobs: [{ pid: 0, cid: 1, segs: startSegs }] });
     const r = res[0];
-    const refT0 = process.env.BSEED ? project(r.pos, Math.max(0, BSTART - 400), BSTART + 400).refT : r.frames;
+    // a seed can be far ahead of (or behind) the reference in time: match it anywhere in the
+    // reference's stretch between the checkpoints it is between
+    const refT0 = process.env.BSEED ? project(r.pos, r.cp > 0 ? cpFrames[r.cp - 1] : 0, r.cp < cpFrames.length ? cpFrames[r.cp] : finish).refT : r.frames;
     beam = [{ id: 1, t: r.frames, pos: r.pos, speed: r.speed, cp: r.cp, parent: beam[0], segs: startSegs, refT: refT0, isRef: true }];
     if (process.env.BSEED) process.send({ log: `[${cfg.name}] seed ${process.env.BSEED} at ${r.frames}: ${(refT0 - r.frames).toFixed(2)} ms ahead of the reference, ${r.speed.toFixed(1)} km/h` });
     await sim.raw({ op: 'bKeep', ids: [1] });
