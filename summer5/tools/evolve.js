@@ -47,7 +47,7 @@ const THROTTLE = !!process.env.THROTTLE;
 const clampWin = (a, b) => { if (!WIN) return [a, b]; const lo = Math.max(a, WIN[0]), hi = Math.min(b, WIN[1]); return lo < hi ? [lo, hi] : [WIN[0], WIN[1]]; };
 const clone = L => Object.fromEntries(Object.entries(L).map(([k, v]) => [k, v.slice()]));
 const rnd = n => Math.floor(Math.random() * n), pick = a => a[rnd(a.length)];
-const valid = L => ['up', 'right', 'down', 'left'].every(k => L[k].every((f, i) => (i === 0 ? f >= (k === 'up' ? 0 : 1) : f > L[k][i - 1])));
+const valid = L => ['up', 'right', 'down', 'left'].every(k => L[k].every((f, i) => (i === 0 ? f >= 0 : f > L[k][i - 1])));   // explore.js runs may press any key on frame 0
 const key = L => STEER.map(k => L[k].join(',')).join('|') + '|' + L.up.join(',');
 const toEvents = L => {
   const ev = []; for (const k of ['up', 'right', 'down', 'left']) L[k].forEach((f, i) => ev.push([f, NAME[k], i % 2 === 0]));
