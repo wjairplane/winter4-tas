@@ -10,12 +10,15 @@
 //  - Car states are snapshots of only the heap pages physics changes (worker_inject.js beam ops).
 //  - NK beams with different settings run in parallel; every finish is re-checked with a clean,
 //    snapshot-free simulation.
-// usage: [CONFIGS=a,b] [NK=4] node tools/explore.js [out=inputs/summer5_explore.json]
+//  - Every time a beam reaches a new checkpoint, its leading line is saved as <out>_cp<k>_<config>.json,
+//    so a later search can resume from it: START=<inputs.json>[:frame] replays those inputs (up to
+//    frame, default all of them) and grows the search from there.
+// usage: [CONFIGS=a,b] [NK=4] [MAX_T=ms] [START=file[:frame]] node tools/explore.js [out=inputs/summer5_explore.json]
 const { fork } = require('child_process'), fs = require('fs'), path = require('path');
 const { createSim, encodeRecording } = require('./sim.js');
 const NAME = { up: 'KeyW', right: 'KeyD', down: 'KeyS', left: 'KeyA' };
 const BIT = { up: 1, right: 2, down: 4, left: 8 };
-const MAX_T = 75000;
+const MAX_T = +(process.env.MAX_T || 200000);   // game-time cap per line (ms)
 
 const CONFIGS = [
   { name: 'e40', BLOCK: 40, K: 160, CELL: 4, NOV: 6, ACTIONS: [1, 9, 3, 8, 2, 0, 4] },
@@ -101,19 +104,27 @@ async function child(cfg) {
   const visits = new Map();
   const cellOf = (cp, p) => cp + ':' + Math.floor(p[0] / CELL) + ',' + Math.floor(p[1] / CELL) + ',' + Math.floor(p[2] / CELL);
   const score = (cp, p, v) => cp * 1e5 - Math.min(5e4, F.dist(Math.min(cp, NCP), p)) + Math.max(0, v) / 3.6 * 0.3;
-  let beam = [{ id: 0, t: 0, pos: null, cp: 0, parent: null, a: null }];
-  let nextId = 1, step = 0, bestFin = null, maxCp = 0, leaksTotal = 0;
+  let beam = [{ id: 0, t: 0, pos: null, cp: 0, parent: null, segs: null }];
+  if (process.env.START) {
+    const [file, upTo] = process.env.START.split(':'), segs = eventsToSegs(JSON.parse(fs.readFileSync(file)), upTo ? +upTo : null);
+    const { res } = await sim.raw({ op: 'bExpand', jobs: [{ pid: 0, cid: 1, segs }] }), r = res[0];
+    if (r.err || r.fin) throw new Error('START prefix ' + (r.err || 'already finishes'));
+    beam = [{ id: 1, t: r.frames, pos: r.pos, cp: r.cp, speed: r.speed, parent: beam[0], segs }];
+    await sim.raw({ op: 'bKeep', ids: [1] });
+    process.send({ log: `[${cfg.name}] start from ${file} at ${r.frames} ms: checkpoint ${r.cp}, ${r.speed.toFixed(0)} km/h` });
+  }
+  let nextId = 2, step = 0, bestFin = null, maxCp = beam[0].cp, leaksTotal = 0;
   const t0 = Date.now();
   while (beam.length) {
     step++;
     const jobs = [], meta = [];
-    for (const nd of beam) for (const a of ACTIONS) { const cid = nextId++; jobs.push({ pid: nd.id, cid, segs: [[a, BLOCK]] }); meta.push({ parent: nd, a }); }
+    for (const nd of beam) for (const a of ACTIONS) { const cid = nextId++, segs = [[a, BLOCK]]; jobs.push({ pid: nd.id, cid, segs }); meta.push({ parent: nd, segs }); }
     let res;
     for (;;) { ({ res } = await sim.raw({ op: 'bExpand', jobs })); const lk = await sim.raw({ op: 'bLeak' }); if (!lk.leak.length) break; leaksTotal += lk.leak.length; }
     const fine = new Map();
     res.forEach((r, i) => {
       if (r.err) return;
-      const nd = { id: r.cid, t: r.frames, pos: r.pos, cp: r.cp, speed: r.speed, parent: meta[i].parent, a: meta[i].a };
+      const nd = { id: r.cid, t: r.frames, pos: r.pos, cp: r.cp, speed: r.speed, parent: meta[i].parent, segs: meta[i].segs };
       if (r.fin) { if (!bestFin || nd.t < bestFin.t) { bestFin = nd; process.send({ log: `[${cfg.name}] finish at ${nd.t} (step ${step})` }); } return; }
       if (r.pos[1] < -40) return;                                 // fell off the world
       const pp = nd.parent.pos, dt = Math.max(1, nd.t - nd.parent.t);
@@ -138,18 +149,34 @@ async function child(cfg) {
     // stop: past the time cap, or nothing alive can still beat the best finish
     beam = beam.filter(n => n.t < MAX_T && (!bestFin || n.t < bestFin.t));
     await sim.raw({ op: 'bKeep', ids: beam.map(n => n.id) });
-    if (beam.length && beam[0].cp > maxCp) { maxCp = beam[0].cp; process.send({ log: `[${cfg.name}] checkpoint ${maxCp}/${NCP} at ${beam[0].t} ms (step ${step}, ${((Date.now() - t0) / 1000).toFixed(0)}s)` }); }
+    if (beam.length && beam[0].cp > maxCp) {
+      maxCp = beam[0].cp;
+      process.send({ log: `[${cfg.name}] checkpoint ${maxCp}/${NCP} at ${beam[0].t} ms (step ${step}, ${((Date.now() - t0) / 1000).toFixed(0)}s)`, dump: { cp: maxCp, events: lineEvents(beam[0]) } });
+    }
     if (step % (+process.env.LOGEVERY || 100) === 0 && beam.length) process.send({ log: `[${cfg.name}] step ${step} t=${beam[0].t} cp=${beam[0].cp} dist=${(beam[0].cp * 1e5 - beam[0].score).toFixed(1)} v=${beam[0].speed.toFixed(0)} pos=${beam[0].pos.map(x => x.toFixed(0)).join(',')} leaks=${leaksTotal} ${((Date.now() - t0) / 1000).toFixed(0)}s` });
   }
   if (!bestFin) return { name: cfg.name, finish: null, maxCp };
-  const acts = []; for (let n = bestFin; n.parent; n = n.parent) acts.push(n.a); acts.reverse();
-  return { name: cfg.name, finish: bestFin.t, events: toEvents(acts, BLOCK) };
+  return { name: cfg.name, finish: bestFin.t, events: lineEvents(bestFin) };
 }
 
-function toEvents(acts, block) {           // per-block key combos -> [frame, key, pressed] toggles
-  const ev = [], on = { up: false, right: false, down: false, left: false };
-  acts.forEach((a, i) => { for (const k in BIT) { const want = !!(a & BIT[k]); if (want !== on[k]) { ev.push([i * block, NAME[k], want]); on[k] = want; } } });
+function lineEvents(nd) {                  // a node's whole input history -> [frame, key, pressed] toggles
+  const chain = []; for (let n = nd; n.parent; n = n.parent) chain.push(n.segs); chain.reverse();
+  const ev = [], on = { up: false, right: false, down: false, left: false }; let f = 0;
+  for (const segs of chain) for (const [a, len] of segs) {
+    for (const k in BIT) { const want = !!(a & BIT[k]); if (want !== on[k]) { ev.push([f, NAME[k], want]); on[k] = want; } }
+    f += len;
+  }
   return ev.sort((x, y) => x[0] - y[0] || x[1].localeCompare(y[1]));
+}
+function eventsToSegs(events, upTo) {      // [frame, key, pressed] toggles -> [[bits, frames], ...]
+  const KB = { KeyW: 1, KeyD: 2, KeyS: 4, KeyA: 8 }, end = upTo ?? Math.max(0, ...events.map(e => e[0])) + 1;
+  const ev = events.filter(e => KB[e[1]]).sort((x, y) => x[0] - y[0]), segs = []; let bits = 0, f = 0, i = 0;
+  while (f < end) {
+    while (i < ev.length && ev[i][0] <= f) { bits = ev[i][2] ? bits | KB[ev[i][1]] : bits & ~KB[ev[i][1]]; i++; }
+    const next = Math.min(end, i < ev.length ? ev[i][0] : end);
+    segs.push([bits, next - f]); f = next;
+  }
+  return segs;
 }
 
 if (process.argv[2] === 'child') {
@@ -161,7 +188,7 @@ if (process.argv[2] === 'child') {
     const results = await Promise.all(CONFIGS.filter(c => only.includes(c.name)).map(cfg => new Promise(res => {
       const c = fork(__filename, ['child'], { serialization: 'advanced' });
       let done = false;
-      c.on('message', m => { if (m.log) console.log(m.log); if (m.result) { done = true; res(m.result); c.kill(); } });
+      c.on('message', m => { if (m.log) console.log(m.log); if (m.dump) fs.writeFileSync(outFile.replace(/\.json$/, `_cp${m.dump.cp}_${cfg.name}.json`), JSON.stringify(m.dump.events)); if (m.result) { done = true; res(m.result); c.kill(); } });
       c.on('exit', code => { if (!done) res({ name: cfg.name, finish: null, error: 'exited ' + code }); });
       c.send({ cfg });
     })));
