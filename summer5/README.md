@@ -9,10 +9,10 @@ the leaderboard was only looked at for the time to beat.
 - 8 checkpoints (taken in order), 1,444,439 verified leaderboard entries.
 - #1 **49.858s** Wak3son (2026-10-07), #2 49.872 SpeedySebas, #3 49.894 youngfella.
 
-## Result: 1:48.375
+## Result: 1:48.283
 
-`tas-exact.user.js` finishes Summer 5 in **1:48.375**. Verified in the real game (headless
-Chromium, submission blocked): `01:48.375`, 8/8 checkpoints. It is a first, unoptimized
+`tas-exact.user.js` finishes Summer 5 in **1:48.283**. Verified in the real game (headless
+Chromium, submission blocked): `01:48.283`, 8/8 checkpoints. It is a first, unoptimized
 route: about twice the #1 time. Improvement cycles come next.
 
 ### How it was found
@@ -32,6 +32,7 @@ route: about twice the #1 time. Improvement cycles come next.
 | Cycle | Method | Time |
 |---|---|---|
 | 0 | explore.js from the start + tunnel random search + explore.js to the finish | 1:48.375 |
+| 1 | `evolve.js`, 30 min (19 reference updates) | 1:48.283 |
 
 ## Use
 
@@ -44,7 +45,7 @@ It submits finished runs to the leaderboard (`ALLOW_SUBMIT = true`); set it to `
 
 ## Files
 
-- `inputs/summer5.json` – the run (`[frame_ms, key, pressed]`).
+- `inputs/summer5.json` – the first run (1:48.375); `inputs/summer5_opt.json` – the current best (`[frame_ms, key, pressed]`).
 - `tas-exact.user.js` – built from `tas-exact.template.js` by `python3 tools/build_userscript.py`.
 - `tools/fetch_sim_assets.sh` – physics worker + wasm and Summer 5 track messages into `sim_assets/`.
 - `tools/explore.js` – the from-scratch search (`START`, `MAX_T`, `CONFIGS` options; saves the
