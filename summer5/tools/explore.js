@@ -30,17 +30,31 @@ const CONFIGS = [
 // min over nearby nodes of (field at node + straight distance to that node).
 function trackField() {
   const t = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'sim_assets', 'track.json')));
-  const S = 5, LINK = +(process.env.LINK || 8), LINKY = +(process.env.LINKY || 3), drivable = n => !/^(Block$|HalfBlock|Pillar|Sign|PlanePillar)/.test(n);
+  const S = 5, LINK = +(process.env.LINK || 8), LINKY = +(process.env.LINKY || 3), WALLPEN = +(process.env.WALLPEN || 400), drivable = n => !/^(Block$|HalfBlock|Pillar|Sign|PlanePillar)/.test(n);
   const nodes = [], at = new Map();
   for (const p of t.parts) {
     if (!drivable(p.name)) continue;
     const k = p.x + ',' + p.y + ',' + p.z; if (at.has(k)) continue;
     at.set(k, nodes.length); nodes.push({ g: [p.x, p.y, p.z], c: [p.x * S, p.y * S, p.z * S], adj: [] });
   }
+  // solid blocks are walls: a link should not pass through a cell that holds a block at the
+  // heights it spans (checked at every intermediate cell, and both side cells of a diagonal step)
+  const solid = new Set(t.parts.filter(p => /^(Block|HalfBlock)$/.test(p.name)).map(p => p.x + ',' + p.y + ',' + p.z));
+  const wall = (x, z, y0, y1) => { for (let y = y0; y <= y1; y++) if (solid.has(x + ',' + y + ',' + z)) return true; return false; };
+  const clear = (a, dx, dy, dz) => {
+    const y0 = Math.min(a[1], a[1] + dy), y1 = Math.max(a[1], a[1] + dy) + 1, steps = Math.max(Math.abs(dx), Math.abs(dz)) / 4;
+    for (let k = 0; k < steps; k++) {
+      const x = a[0] + Math.sign(dx) * Math.min(Math.abs(dx), 4 * k), z = a[2] + Math.sign(dz) * Math.min(Math.abs(dz), 4 * k);
+      const nx = a[0] + Math.sign(dx) * Math.min(Math.abs(dx), 4 * (k + 1)), nz = a[2] + Math.sign(dz) * Math.min(Math.abs(dz), 4 * (k + 1));
+      if (k > 0 && wall(x, z, y0, y1)) return false;
+      if (nx !== x && nz !== z && wall(nx, z, y0, y1) && wall(x, nz, y0, y1)) return false;
+    }
+    return true;
+  };
   for (const [i, n] of nodes.entries()) for (let dx = -LINK; dx <= LINK; dx += 4) for (let dz = -LINK; dz <= LINK; dz += 4) for (let dy = -LINKY; dy <= LINKY; dy++) {
     if (!dx && !dz && !dy) continue;
     const j = at.get((n.g[0] + dx) + ',' + (n.g[1] + dy) + ',' + (n.g[2] + dz));
-    if (j !== undefined) n.adj.push([j, Math.hypot(dx * S, dy * S, dz * S)]);
+    if (j !== undefined) n.adj.push([j, Math.hypot(dx * S, dy * S, dz * S) + (clear(n.g, dx, dy, dz) ? 0 : WALLPEN)]);   // through a wall: allowed (jumps), but costly
   }
   const cpParts = t.parts.filter(p => p.cp != null).sort((a, b) => a.cp - b.cp).concat([t.parts.find(p => p.name === 'Finish')]);
   const fields = cpParts.map(p => {
@@ -60,7 +74,10 @@ function trackField() {
     for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) for (const i of cells.get((cx + a) + ',' + (cz + b)) || []) {
       const c = nodes[i].c, dy = p[1] - c[1];
       if (dy < -6 || dy > 12) continue;          // a node on another level is not where the car is
-      const d = D[i] + Math.hypot(p[0] - c[0], p[1] - c[1], p[2] - c[2]); if (d < best) best = d;
+      // only the parts the car is on or next to (a part is 20 m): measuring straight to a farther
+      // node would cut through walls; farther nodes are a fallback, at a cost
+      const h = Math.hypot(p[0] - c[0], p[2] - c[2]), d = D[i] + Math.hypot(h, dy) + (h > 16 ? 200 + 4 * h : 0);
+      if (d < best) best = d;
     }
     return best;
   };
@@ -114,7 +131,8 @@ async function child(cfg) {
     const top = all[0].cp;
     const fresh = all.filter(n => n.cp === top && !picked.has(n)).sort((a, b) => (visits.get(a.cell) - visits.get(b.cell)) || (b.score - a.score));
     const novCells = new Set();
-    for (const nd of fresh) { if (picked.size >= Math.floor(K / 3) + Math.floor(K / 4)) break; if (visits.get(nd.cell) <= NOV && !novCells.has(nd.cell)) { novCells.add(nd.cell); picked.add(nd); } }
+    // least-visited cells first, always (a fixed visit threshold stops exploring once a dead end is crowded)
+    for (const nd of fresh) { if (picked.size >= Math.floor(K / 3) + Math.floor(K / 4)) break; if (!novCells.has(nd.cell)) { novCells.add(nd.cell); picked.add(nd); } }
     for (const nd of all) { if (picked.size >= K) break; picked.add(nd); }
     beam = [...picked].sort((a, b) => b.score - a.score);
     // stop: past the time cap, or nothing alive can still beat the best finish
