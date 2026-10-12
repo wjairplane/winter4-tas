@@ -156,6 +156,7 @@ async function beamChild(cfg, refFile) {
     for (const nd of sorted) { if (picked.size >= Math.floor(K / 3)) break; if (!seenC.has(nd.coarse)) { seenC.add(nd.coarse); picked.add(nd); } }
     for (const nd of sorted) { if (picked.size >= K) break; picked.add(nd); }
     beam = [...picked].sort((a, b) => b.score - a.score);
+    if (!beam.length) process.send({ log: `[${cfg.name}] all lines dropped at t=${prevTop ? prevTop.t : '?'} (pos ${prevTop && prevTop.pos ? prevTop.pos.map(x => x.toFixed(0)).join(',') : '?'}, ref t ${prevTop ? prevTop.refT.toFixed(0) : '?'}): ${JSON.stringify(why)}` });
     if (refNode && !beam.includes(refNode)) beam[beam.length - 1 < K - 1 ? beam.length : K - 1] = refNode;   // the reference line always survives
     await sim.raw({ op: 'bKeep', ids: beam.map(n => n.id) });
     // BDUMP=<frame>:<file>: save the leading line's inputs once it passes <frame> (seed for tools/landing.js)
