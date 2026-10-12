@@ -115,23 +115,24 @@ async function child(cfg) {
     const { res } = await sim.raw({ op: 'bExpand', jobs: [{ pid: 0, cid: 1, segs }] }), r = res[0];
     if (r.err || r.fin) throw new Error('START prefix ' + (r.err || 'already finishes'));
     beam = [{ id: 1, t: r.frames, pos: r.pos, cp: r.cp, speed: r.speed, parent: beam[0], segs }];
-    await sim.raw({ op: 'bKeep', ids: [1] });
+    await sim.raw({ op: 'bKeep', ids: [0, 1] });
     process.send({ log: `[${cfg.name}] start from ${file} at ${r.frames} ms: checkpoint ${r.cp}, ${r.speed.toFixed(0)} km/h` });
   }
-  let nextId = 2, step = 0, bestFin = null, maxCp = beam[0].cp, leaksTotal = 0;
+  const ROOT = process.env.START ? 1 : 0;
+  let nextId = 2, step = 0, bad = 0, bestFin = null, maxCp = beam[0].cp, leaksTotal = 0;
   const t0 = Date.now();
   while (beam.length) {
     step++;
     const jobs = [], meta = [];
     for (const nd of beam) for (const a of ACTIONS) { const cid = nextId++, segs = [[a, BLOCK]]; jobs.push({ pid: nd.id, cid, segs }); meta.push({ parent: nd, segs }); }
     let res;
-    for (;;) { ({ res } = await sim.raw({ op: 'bExpand', jobs })); const lk = await sim.raw({ op: 'bLeak' }); if (!lk.leak.length) break; leaksTotal += lk.leak.length; }
-    const fine = new Map();
+    for (;;) { ({ res } = await sim.raw({ op: 'bExpand', jobs })); const lk = await sim.raw({ op: 'bLeak' }); if (!lk.leak.length) break; leaksTotal += lk.leak.length; if (+process.env.CHECK) process.send({ log: `[${cfg.name}] step ${step}: ${lk.leak.length} leaked pages, re-run` }); }
+    const fine = new Map(), arrivals = [];
     res.forEach((r, i) => {
       if (r.err) return;
       const nd = { id: r.cid, t: r.frames, pos: r.pos, cp: r.cp, speed: r.speed, parent: meta[i].parent, segs: meta[i].segs };
       if (r.fin || (STOPCP && r.cp >= STOPCP)) {   // goal reached: keep the earliest arrival (faster one on a tie)
-        if (!bestFin || nd.t < bestFin.t || (nd.t === bestFin.t && nd.speed > bestFin.speed)) { bestFin = nd; process.send({ log: `[${cfg.name}] ${STOPCP ? 'checkpoint ' + STOPCP + ' reached' : 'finish'} at ${nd.t} (step ${step}, ${nd.speed.toFixed(0)} km/h)` }); }
+        if (!bestFin || nd.t < bestFin.t || (nd.t === bestFin.t && nd.speed > bestFin.speed)) arrivals.push(nd);
         return;
       }
       if (r.pos[1] < -40) return;                                 // fell off the world
@@ -142,6 +143,14 @@ async function child(cfg) {
       const fk = nd.cp + ':' + r.pos.map(x => Math.round(x / 0.4)).join(',') + '|' + Math.round(Math.atan2(r.pos[0] - (pp || r.pos)[0], r.pos[2] - (pp || r.pos)[2]) / 0.05) + '|' + Math.round(r.speed / 3);
       const c = fine.get(fk); if (!c || nd.score > c.score) fine.set(fk, nd);
     });
+    // an arrival counts only if replaying its inputs from the section start reproduces it
+    for (const nd of arrivals.sort((a, b) => a.t - b.t || b.speed - a.speed)) {
+      if (bestFin && (nd.t > bestFin.t || (nd.t === bestFin.t && nd.speed <= bestFin.speed))) break;
+      const chain = []; for (let n = nd; n.id !== ROOT; n = n.parent) chain.push(n.segs);
+      const r = (await sim.raw({ op: 'bExpand', jobs: [{ pid: ROOT, cid: -1, segs: [].concat(...chain.reverse()) }] })).res[0];
+      if (r.err || Math.hypot(r.pos[0] - nd.pos[0], r.pos[1] - nd.pos[1], r.pos[2] - nd.pos[2]) > 1e-3) { bad++; continue; }
+      bestFin = nd; process.send({ log: `[${cfg.name}] ${STOPCP ? 'checkpoint ' + STOPCP + ' reached' : 'finish'} at ${nd.t} (step ${step}, ${nd.speed.toFixed(0)} km/h, replay-checked)` }); break;
+    }
     const all = [...fine.values()].sort((a, b) => b.score - a.score);
     if (!all.length) break;
     for (const nd of all) visits.set(nd.cell, (visits.get(nd.cell) || 0) + 1);
@@ -154,14 +163,32 @@ async function child(cfg) {
     for (const nd of fresh) { if (picked.size >= Math.floor(K / 3) + Math.floor(K / 4)) break; if (!novCells.has(nd.cell)) { novCells.add(nd.cell); picked.add(nd); } }
     for (const nd of all) { if (picked.size >= K) break; picked.add(nd); }
     beam = [...picked].sort((a, b) => b.score - a.score);
+    // A few saved states do not match their own inputs (a snapshot problem, not physics: replays are
+    // exact). Keep the leading line honest: replay it from the section start and drop it if it differs.
+    if (process.env.VERIFY !== '0') for (let tries = 0; beam.length && tries < 20; tries++) {
+      const top = beam[0]; if (top.ok) break;
+      const chain = []; for (let n = top; n.id !== ROOT; n = n.parent) chain.push(n.segs);
+      const r = (await sim.raw({ op: 'bExpand', jobs: [{ pid: ROOT, cid: -1, segs: [].concat(...chain.reverse()) }] })).res[0];
+      if (!r.err && Math.hypot(r.pos[0] - top.pos[0], r.pos[1] - top.pos[1], r.pos[2] - top.pos[2]) < 1e-3) { top.ok = true; break; }
+      bad++; beam.shift();
+    }
     // stop: past the time cap, or nothing alive can still beat the best finish
     beam = beam.filter(n => n.t < MAX_T && (!bestFin || n.t < bestFin.t));
-    await sim.raw({ op: 'bKeep', ids: beam.map(n => n.id) });
+    await sim.raw({ op: 'bKeep', ids: beam.map(n => n.id).concat([0, ROOT]) });
+    // CHECK=n: every n steps replay the leading line from the start state and compare (snapshot drift)
+    if (+process.env.CHECK && step % +process.env.CHECK === 0 && beam.length) {
+      const chain = []; for (let n = beam[0]; n.parent; n = n.parent) chain.push(n.segs);
+      const segs = [].concat(...chain.reverse()), r = (await sim.raw({ op: 'bExpand', jobs: [{ pid: 0, cid: -1, segs }] })).res[0];
+      const r2 = (await sim.raw({ op: 'bExpand', jobs: [{ pid: 0, cid: -2, segs }] })).res[0];
+      await sim.raw({ op: 'bKeep', ids: beam.map(n => n.id).concat([0, ROOT]) });
+      const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+      process.send({ log: `[${cfg.name}] CHECK step ${step} t=${beam[0].t}: replay differs by ${dist(r.pos, beam[0].pos).toFixed(4)} m (second replay vs first: ${dist(r.pos, r2.pos).toFixed(4)} m)` });
+    }
     if (beam.length && beam[0].cp > maxCp) {
       maxCp = beam[0].cp;
       process.send({ log: `[${cfg.name}] checkpoint ${maxCp}/${NCP} at ${beam[0].t} ms (step ${step}, ${((Date.now() - t0) / 1000).toFixed(0)}s)`, dump: { cp: maxCp, events: lineEvents(beam[0]) } });
     }
-    if (step % (+process.env.LOGEVERY || 100) === 0 && beam.length) process.send({ log: `[${cfg.name}] step ${step} t=${beam[0].t} cp=${beam[0].cp} dist=${(beam[0].cp * 1e5 - beam[0].score).toFixed(1)} v=${beam[0].speed.toFixed(0)} pos=${beam[0].pos.map(x => x.toFixed(0)).join(',')} leaks=${leaksTotal} ${((Date.now() - t0) / 1000).toFixed(0)}s` });
+    if (step % (+process.env.LOGEVERY || 100) === 0 && beam.length) process.send({ log: `[${cfg.name}] step ${step} t=${beam[0].t} cp=${beam[0].cp} dist=${(beam[0].cp * 1e5 - beam[0].score).toFixed(1)} v=${beam[0].speed.toFixed(0)} pos=${beam[0].pos.map(x => x.toFixed(0)).join(',')} leaks=${leaksTotal} dropped-mismatched=${bad} ${((Date.now() - t0) / 1000).toFixed(0)}s` });
   }
   if (!bestFin) return { name: cfg.name, finish: null, maxCp };
   return { name: cfg.name, finish: bestFin.t, events: lineEvents(bestFin) };
