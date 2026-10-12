@@ -9,7 +9,8 @@
 //  - Car states are heap snapshots of only the pages physics changes (~0.5 MB, not 24 MB).
 //  - NK independent beams with different settings run in parallel (one per core); the main
 //    process verifies every result with a clean, snapshot-free simulation.
-// usage: [CONFIGS=l10,..] [BSTART=frame [BSEED=inputs.json]] [NFIN=k] node tools/beam.js [ref=inputs/summer5_opt.json] [out=inputs/summer5_beam.json]
+// BSTOPCP=k: collecting checkpoint k counts as the finish (one section at a time; <out>.t gets the frame)
+// usage: [CONFIGS=l10,..] [BSTART=frame [BSEED=inputs.json]] [BSTOPCP=k] [NFIN=k] node tools/beam.js [ref=inputs/summer5_opt.json] [out=inputs/summer5_beam.json]
 const { fork } = require('child_process'), fs = require('fs');
 const { createSim, encodeRecording } = require('./sim.js');
 const KEY = { KeyW: 'up', KeyD: 'right', KeyS: 'down', KeyA: 'left', Reset: 'reset' };
@@ -124,7 +125,7 @@ async function beamChild(cfg, refFile) {
     res.forEach((r, i) => {
       if (r.err) return;
       const nd = { id: r.cid, t: r.frames, pos: r.pos, speed: r.speed, cp: r.cp, parent: meta[i].parent, segs: meta[i].segs, isRef: meta[i].isRef, sh: meta[i].sh };
-      if (r.fin) { finishers.push(nd); if (!bestFin || r.frames < bestFin.t) bestFin = nd; return; }
+      if (r.fin || (+process.env.BSTOPCP && r.cp >= +process.env.BSTOPCP)) { finishers.push(nd); if (!bestFin || r.frames < bestFin.t) bestFin = nd; return; }
       // progress is continuous: the match point can only move a little from the parent's
       // (stops matches jumping to another part of the track that passes nearby)
       const adv = nd.t - nd.parent.t, pr = project(r.pos, nd.parent.refT + 0.3 * adv, nd.parent.refT + 1.7 * adv);
@@ -213,7 +214,9 @@ const only = process.env.CONFIGS ? process.env.CONFIGS.split(',') : ['b20', 'b15
   for (const r of results) {
     if (!r.finish) { console.log(`${r.name}: no finish${r.error ? ' (' + r.error + ')' : ''}`); continue; }
     const L = { up: [], right: [], down: [], left: [], reset: [] }; for (const [f, k] of r.events) L[KEY[k]].push(f);
-    const v = await sim.run(encodeRecording(L), 300000);
+    const STOP = +process.env.BSTOPCP || 0;
+    const v = STOP ? await (async () => { await sim.initFast(); const q = await sim.evalFrom(L, 0, 300000, 0, STOP); return { frames: q.cp >= STOP ? q.frames : Infinity }; })()
+      : await sim.run(encodeRecording(L), 300000);
     console.log(`${r.name}: beam finish ${r.finish}, clean re-simulation ${v.frames}`);
     if (!best || v.frames < best.frames) best = { ...r, frames: v.frames };
     for (const [i, a] of (r.alts || []).entries()) {
@@ -223,6 +226,6 @@ const only = process.env.CONFIGS ? process.env.CONFIGS.split(',') : ['b20', 'b15
       console.log(`  ${r.name} alt ${i}: splits from reference at ${a.split} ms, clean finish ${av.frames} -> ${f}`);
     }
   }
-  if (best) { fs.writeFileSync(outFile, JSON.stringify(best.events)); console.log(`best: ${best.name} ${best.frames} frames -> ${outFile}`); }
+  if (best) { fs.writeFileSync(outFile, JSON.stringify(best.events)); fs.writeFileSync(outFile + '.t', String(best.frames)); console.log(`best: ${best.name} ${best.frames} frames -> ${outFile}`); }
   process.exit(0);
 })();
