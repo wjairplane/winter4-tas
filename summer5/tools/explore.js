@@ -197,7 +197,7 @@ if (process.argv[2] === 'child') {
       if (!r.finish) { console.log(`${r.name}: no finish (max checkpoint ${r.maxCp ?? '?'})${r.error ? ' ' + r.error : ''}`); continue; }
       const L = { up: [], right: [], down: [], left: [], reset: [] }; const K2 = { KeyW: 'up', KeyD: 'right', KeyS: 'down', KeyA: 'left' };
       for (const [f, k] of r.events) L[K2[k]].push(f);
-      const v = await sim.run(encodeRecording(L), 90000);
+      const v = await sim.run(encodeRecording(L), MAX_T + 10000);
       console.log(`${r.name}: search finish ${r.finish}, clean re-simulation ${v.frames}`);
       fs.writeFileSync(outFile.replace(/\.json$/, `_${r.name}.json`), JSON.stringify(r.events));
       if (!best || v.frames < best.frames) best = { ...r, frames: v.frames };

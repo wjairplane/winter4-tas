@@ -25,7 +25,7 @@ const TRACK = 'Summer 5';
       document.body.dispatchEvent(e('keydown')); setTimeout(() => document.body.dispatchEvent(e('keyup')), 400); });
     await p.waitForTimeout(1200);
   }
-  await p.waitForTimeout(60000);
+  await p.waitForTimeout(+(process.env.WAIT || 120000));
   const t = await txt();
   // end screen text looks like "... 4/4 250km/h Record --- Current 00:12.345 00:19.311 Difference --- ... Summer 5 00:19.311 -"
   const m = t.match(new RegExp(TRACK + ' (\\d\\d:\\d\\d\\.\\d{3})')) || t.match(/(\d\d:\d\d\.\d{3}) Difference/), cps = (t.match(/(\d+)\/(\d+) \d+ ?km\/h/) || [, '?', '?']);
