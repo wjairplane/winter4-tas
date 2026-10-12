@@ -1,5 +1,5 @@
-// Hill-climbing search for a faster Summer 1 run using the offline simulator.
-// usage: node tools/optimize.js [minutes=10] [in=inputs/summer1.json] [out=inputs/summer1_opt.json]
+// Hill-climbing search for a faster Winter 4 run using the offline simulator.
+// usage: node tools/optimize.js [minutes=10] [in=inputs/winter4.json] [out=inputs/winter4_opt.json]
 const { fork } = require('child_process'), fs = require('fs');
 const { createSim, encodeRecording, decodePos } = require('./sim.js');
 const KEY = { KeyW: 'up', KeyD: 'right', KeyS: 'down', KeyA: 'left', Reset: 'reset' };
@@ -17,7 +17,7 @@ if (process.argv[2] === 'child') {
   })();
 } else {
   const minutes = +(process.argv[2] || 10);
-  const inFile = process.argv[3] || 'inputs/summer1.json', outFile = process.argv[4] || 'inputs/summer1_opt.json';
+  const inFile = process.argv[3] || 'inputs/winter4.json', outFile = process.argv[4] || 'inputs/winter4_opt.json';
   const lists = { up: [], right: [], down: [], left: [], reset: [] };
   for (const [f, k, d] of JSON.parse(fs.readFileSync(inFile))) lists[KEY[k]].push(f);
   for (const k in lists) lists[k].sort((a, b) => a - b);
@@ -36,7 +36,7 @@ if (process.argv[2] === 'child') {
     if (r < 0.6) l[i] += d;                                           // move one toggle
     else if (r < 0.8) { const j = i ^ 1; if (j < l.length) { l[i] += d; l[j] += d; } } // move a whole tap
     else if (r < 0.9 && l.length > 2) { const j = i - (i % 2); l.splice(j, 2); }       // drop a tap
-    else { const t = rnd(21500) + 200, w = 15 + rnd(60); l.push(t, t + w); l.sort((a, b) => a - b); } // add a tap
+    else { const t = rnd(19000) + 200, w = 15 + rnd(60); l.push(t, t + w); l.sort((a, b) => a - b); } // add a tap
     return valid(M) ? M : null;
   }
 
@@ -49,7 +49,7 @@ if (process.argv[2] === 'child') {
     const setBase = (L, cap) => Promise.all(kids.map(c => send(c, { op: 'setBase', L, cap })));
     const firstDiff = (A, B) => { let m = Infinity; for (const k of ['up', 'right', 'down', 'left']) { const n = Math.max(A[k].length, B[k].length); for (let i = 0; i < n; i++) if (A[k][i] !== B[k][i]) { m = Math.min(m, A[k][i] ?? Infinity, B[k][i] ?? Infinity); break; } } return m; };
 
-    let best = lists, cap = 22113;                  // goal: finish at frame <= cap
+    let best = lists, cap = 19310;                  // goal: finish at frame <= cap
     const base = (await setBase(best, 30000))[0];
     console.log('baseline frames', base.frames);
     cap = base.frames - 1;

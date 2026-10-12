@@ -9,7 +9,7 @@
 //  - Car states are heap snapshots of only the pages physics changes (~0.5 MB, not 24 MB).
 //  - NK independent beams with different settings run in parallel (one per core); the main
 //    process verifies every result with a clean, snapshot-free simulation.
-// usage: [CONFIGS=l10,..] [BSTART=frame [BSEED=inputs.json]] [NFIN=k] node tools/beam.js [ref=inputs/summer1_opt.json] [out=inputs/summer1_beam.json]
+// usage: [CONFIGS=l10,..] [BSTART=frame [BSEED=inputs.json]] [NFIN=k] node tools/beam.js [ref=inputs/winter4_opt.json] [out=inputs/winter4_beam.json]
 const { fork } = require('child_process'), fs = require('fs');
 const { createSim, encodeRecording } = require('./sim.js');
 const KEY = { KeyW: 'up', KeyD: 'right', KeyS: 'down', KeyA: 'left', Reset: 'reset' };
@@ -196,7 +196,7 @@ if (process.argv[2] === 'child') {
   return;
 }
 
-const refFile = process.argv[2] || 'inputs/summer1_opt.json', outFile = process.argv[3] || 'inputs/summer1_beam.json';
+const refFile = process.argv[2] || 'inputs/winter4_opt.json', outFile = process.argv[3] || 'inputs/winter4_beam.json';
 const only = process.env.CONFIGS ? process.env.CONFIGS.split(',') : ['b20', 'b15', 'b25', 'b20fine'];
 (async () => {
   const cfgs = CONFIGS.filter(c => !only || only.includes(c.name));

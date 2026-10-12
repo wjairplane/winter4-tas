@@ -35,7 +35,7 @@ if (process.argv[2] === 'child') {
 }
 
 const minutes = +(process.argv[2] || 10);
-const inFile = process.argv[3] || 'inputs/summer1_opt.json', outFile = process.argv[4] || 'inputs/summer1_opt.json';
+const inFile = process.argv[3] || 'inputs/winter4_opt.json', outFile = process.argv[4] || 'inputs/winter4_opt.json';
 const seed = { up: [], right: [], down: [], left: [], reset: [] };
 for (const [f, k] of JSON.parse(fs.readFileSync(inFile))) seed[KEY[k]].push(f);
 for (const k in seed) seed[k].sort((a, b) => a - b);
@@ -102,7 +102,7 @@ function big(L) {
   return M;
 }
 function crossover(A, B) {                          // A before time t, B from t on
-  const t = 300 + rnd(21000), C = {};
+  const t = 300 + rnd(18800), C = {};
   for (const k of ['up', 'right', 'down', 'left', 'reset']) {
     const a = A[k].filter(f => f < t), b = B[k].filter(f => f >= t);
     const pa = a.length % 2, pb = B[k].filter(f => f < t).length % 2;   // key state at t in A vs B

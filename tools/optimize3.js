@@ -2,13 +2,13 @@
 // Big moves: shift every input in a time range, stretch/shrink all taps in a range, replace a
 // range's steering with one hold, add a brake (S) hold. Each is then repaired with small edits
 // inside the changed range before being judged, since a new line needs re-tuned follow-ups.
-// Windowed search for a faster Summer 1 run.
+// Windowed search for a faster Winter 4 run.
 //  - Score = "ms ahead of the current best run": candidate position is projected onto the
 //    best run's per-frame racing line, giving sub-millisecond resolution anywhere on track.
 //  - A candidate edited at frame T is first simulated only to T + WINDOW (cheap filter);
 //    promising ones are then simulated up to just before the finish (TF) and accepted only
 //    if they are ahead there, so a misleading short-window score can't be accepted.
-// usage: node tools/optimize2.js [minutes=10] [in=inputs/summer1_opt.json] [out=inputs/summer1_opt.json]
+// usage: node tools/optimize2.js [minutes=10] [in=inputs/winter4_opt.json] [out=inputs/winter4_opt.json]
 const { fork } = require('child_process'), fs = require('fs');
 const { createSim, decodePos } = require('./sim.js');
 const KEY = { KeyW: 'up', KeyD: 'right', KeyS: 'down', KeyA: 'left', Reset: 'reset' };
@@ -31,7 +31,7 @@ if (process.argv[2] === 'child') {
 }
 
 const minutes = +(process.argv[2] || 10);
-const inFile = process.argv[3] || 'inputs/summer1_opt.json', outFile = process.argv[4] || 'inputs/summer1_opt.json';
+const inFile = process.argv[3] || 'inputs/winter4_opt.json', outFile = process.argv[4] || 'inputs/winter4_opt.json';
 const lists = { up: [], right: [], down: [], left: [], reset: [] };
 for (const [f, k] of JSON.parse(fs.readFileSync(inFile))) lists[KEY[k]].push(f);
 for (const k in lists) lists[k].sort((a, b) => a - b);
@@ -45,9 +45,9 @@ function mutate(L) {
   const d = pick([-1, 1, -2, 2, -3, 3, -5, 5, -8, 8, -13, 13, -21, 21, -34, 34]);
   if (k === 'up') {                                              // try a brief throttle lift
     if (r < 0.5 && l.length > 1) { const i = 1 + rnd(l.length - 1); l[i] += d; }
-    else { const t = 200 + rnd(21500), w = 5 + rnd(40); l.push(t, t + w); l.sort((a, b) => a - b); }
+    else { const t = 200 + rnd(19000), w = 5 + rnd(40); l.push(t, t + w); l.sort((a, b) => a - b); }
   } else if (!l.length || r < 0.08) {                              // add a tap
-    const t = 200 + rnd(21500), w = 10 + rnd(60); l.push(t, t + w); l.sort((a, b) => a - b);
+    const t = 200 + rnd(19000), w = 10 + rnd(60); l.push(t, t + w); l.sort((a, b) => a - b);
   } else {
     const i = rnd(l.length);
     if (r < 0.6) l[i] += d;                                       // move one edge

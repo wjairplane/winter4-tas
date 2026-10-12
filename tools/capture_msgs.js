@@ -1,3 +1,5 @@
+// Captures the Init and Winter 4 track messages the physics worker needs (for tools/sim.js).
+// usage: node tools/capture_msgs.js sim_assets
 const { chromium } = require('playwright'); const fs = require('fs');
 (async () => {
   const b = await chromium.launch({ args: ['--use-angle=swiftshader','--use-gl=angle','--enable-unsafe-swiftshader','--ignore-gpu-blocklist','--no-sandbox'] });
@@ -17,6 +19,12 @@ const { chromium } = require('playwright'); const fs = require('fs');
   });
   await p.goto('https://app-polytrack.kodub.com/0.6.3/', { waitUntil: 'load' });
   await p.waitForTimeout(8000);
+  // the page opens on Summer 1; drop its messages (keep the Init ones) and load Winter 4
+  const ok = p.getByText('Ok', { exact: true }); if (await ok.count()) await ok.first().click();
+  await p.getByText('Exit', { exact: true }).first().click(); await p.waitForTimeout(1500);
+  msgs.splice(0, msgs.length, ...msgs.filter(s => JSON.parse(s).messageType === 0));
+  await p.locator('button', { hasText: 'Winter 4' }).first().click(); await p.waitForTimeout(1500);
+  await p.locator('button:visible', { hasText: /^\s*Play\s*$/ }).first().click(); await p.waitForTimeout(5000);
   fs.writeFileSync(process.argv[2]+'/msgs.json', JSON.stringify(msgs.map(s=>JSON.parse(s)).filter(m=>!('up' in m && !m.trackData))));
   console.log(msgs.length, msgs.map(s=>{const m=JSON.parse(s);return m.messageType+':'+s.length}).join(' '));
   await b.close();
