@@ -81,7 +81,7 @@ function small(L, a, b) {                          // edit one toggle/tap inside
 }
 function big(L) {
   const M = clone(L), r = Math.random();
-  const a = WIN ? WIN[0] + rnd(Math.max(1, WIN[1] - WIN[0] - 200)) : 300 + rnd(20500), len = 200 + rnd(1500), b = WIN ? Math.min(WIN[1], a + len) : a + len, inR = f => f >= a && f < b;
+  const a = WIN ? WIN[0] + rnd(Math.max(1, WIN[1] - WIN[0] - 200)) : 300 + rnd(18500), len = 200 + rnd(1500), b = WIN ? Math.min(WIN[1], a + len) : a + len, inR = f => f >= a && f < b;
   if (r < 0.35) {
     const d = pick([-150, -100, -60, -40, -25, 25, 40, 60, 100, 150]);
     for (const k of STEER) M[k] = M[k].map(f => inR(f) ? f + d : f);

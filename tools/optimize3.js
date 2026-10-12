@@ -58,7 +58,7 @@ function mutate(L) {
 }
 function mutateBig(L) {
   const M = clone(L), r = Math.random();
-  const a = 300 + rnd(20500), len = 200 + rnd(1500), b = a + len;
+  const a = 300 + rnd(18500), len = 200 + rnd(1500), b = a + len;
   const inR = f => f >= a && f < b;
   if (r < 0.35) {                                   // shift all inputs in [a,b) earlier/later
     const d = pick([-150, -100, -60, -40, -25, 25, 40, 60, 100, 150]);
