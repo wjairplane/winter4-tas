@@ -109,7 +109,9 @@ async function child(cfg) {
   const score = (cp, p, v) => cp * 1e5 - Math.min(5e4, F.dist(Math.min(cp, NCP), p)) + Math.max(0, v) / 3.6 * 0.3;
   let beam = [{ id: 0, t: 0, pos: null, cp: 0, parent: null, segs: null }];
   if (process.env.START) {
-    const [file, upTo] = process.env.START.split(':'), segs = eventsToSegs(JSON.parse(fs.readFileSync(file)), upTo ? +upTo : null);
+    const [file, upTo] = process.env.START.split(':'), saved = JSON.parse(fs.readFileSync(file));
+    // an event list, or a beam.js BDUMP ({ bits: per-frame key bits })
+    const segs = Array.isArray(saved) ? eventsToSegs(saved, upTo ? +upTo : null) : bitsToSegs(saved.bits.slice(0, upTo ? +upTo : saved.bits.length));
     const { res } = await sim.raw({ op: 'bExpand', jobs: [{ pid: 0, cid: 1, segs }] }), r = res[0];
     if (r.err || r.fin) throw new Error('START prefix ' + (r.err || 'already finishes'));
     beam = [{ id: 1, t: r.frames, pos: r.pos, cp: r.cp, speed: r.speed, parent: beam[0], segs }];
@@ -174,6 +176,7 @@ function lineEvents(nd) {                  // a node's whole input history -> [f
   }
   return ev.sort((x, y) => x[0] - y[0] || x[1].localeCompare(y[1]));
 }
+function bitsToSegs(bits) { const segs = []; for (const b of bits) { if (segs.length && segs[segs.length - 1][0] === b) segs[segs.length - 1][1]++; else segs.push([b, 1]); } return segs; }
 function eventsToSegs(events, upTo) {      // [frame, key, pressed] toggles -> [[bits, frames], ...]
   const KB = { KeyW: 1, KeyD: 2, KeyS: 4, KeyA: 8 }, end = upTo ?? Math.max(0, ...events.map(e => e[0])) + 1;
   const ev = events.filter(e => KB[e[1]]).sort((x, y) => x[0] - y[0]), segs = []; let bits = 0, f = 0, i = 0;
