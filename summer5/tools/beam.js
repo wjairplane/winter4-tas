@@ -86,7 +86,8 @@ async function beamChild(cfg, refFile) {
   const BSTART = +(process.env.BSTART || 0);
   if (BSTART > 0) {
     const startSegs = segsOf(clockBits, 0, BSTART);
-    const { res } = await sim.raw({ op: 'bExpand', jobs: [{ pid: 0, cid: 1, segs: startSegs }] });
+    // redo the start until it touches no heap page outside the snapshot set (see explore.js)
+    let res; for (;;) { ({ res } = await sim.raw({ op: 'bExpand', jobs: [{ pid: 0, cid: 1, segs: startSegs }] })); if (!(await sim.raw({ op: 'bLeak' })).leak.length) break; }
     const r = res[0];
     // a seed can be far ahead of (or behind) the reference in time: match it anywhere in the
     // reference's stretch between the checkpoints it is between

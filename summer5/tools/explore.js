@@ -112,7 +112,10 @@ async function child(cfg) {
     const [file, upTo] = process.env.START.split(':'), saved = JSON.parse(fs.readFileSync(file));
     // an event list, or a beam.js BDUMP ({ bits: per-frame key bits })
     const segs = Array.isArray(saved) ? eventsToSegs(saved, upTo ? +upTo : null) : bitsToSegs(saved.bits.slice(0, upTo ? +upTo : saved.bits.length));
-    const { res } = await sim.raw({ op: 'bExpand', jobs: [{ pid: 0, cid: 1, segs }] }), r = res[0];
+    // the prefix may touch heap pages the snapshot set misses; find them, then redo the prefix so
+    // the start state's snapshot includes them (otherwise they would be filled in as post-init zeros)
+    let res; for (;;) { ({ res } = await sim.raw({ op: 'bExpand', jobs: [{ pid: 0, cid: 1, segs }] })); if (!(await sim.raw({ op: 'bLeak' })).leak.length) break; }
+    const r = res[0];
     if (r.err || r.fin) throw new Error('START prefix ' + (r.err || 'already finishes'));
     beam = [{ id: 1, t: r.frames, pos: r.pos, cp: r.cp, speed: r.speed, parent: beam[0], segs }];
     await sim.raw({ op: 'bKeep', ids: [0, 1] });
