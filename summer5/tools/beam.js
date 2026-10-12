@@ -130,7 +130,7 @@ async function beamChild(cfg, refFile) {
       if (r.fin || (+process.env.BSTOPCP && r.cp >= +process.env.BSTOPCP)) { finishers.push(nd); if (!bestFin || r.frames < bestFin.t) bestFin = nd; return; }
       // progress is continuous: the match point can only move a little from the parent's
       // (stops matches jumping to another part of the track that passes nearby)
-      const adv = nd.t - nd.parent.t, pr = project(r.pos, nd.parent.refT + 0.3 * adv, nd.parent.refT + 1.7 * adv);
+      const adv = nd.t - nd.parent.t, vr0 = Math.max(5, V[Math.min(V.length - 1, Math.round(nd.parent.refT))] || 5), fast = Math.max(1, Math.abs(r.speed) / vr0), pr = project(r.pos, nd.parent.refT + 0.3 * adv, nd.parent.refT + 1.7 * adv * fast + 5);   // a car much faster than the reference here covers more of its line per step
       if (process.env.BTRACE && nd.parent === prevTop && (!topKid || pr.refT > topKid.refT)) topKid = { refT: pr.refT, off: pr.off, dy: pr.dy, speed: r.speed, cp: r.cp, pos: r.pos, t: nd.t };
       if (pr.off > DEAD_OFF) { why.off++; return; }
       if (pr.dy < -8 || pr.dy > 80) { why.dy++; return; }             // well below the track = fell off; far above = flying (allowed)
