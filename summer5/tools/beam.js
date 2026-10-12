@@ -219,7 +219,7 @@ const only = process.env.CONFIGS ? process.env.CONFIGS.split(',') : ['b20', 'b15
     const L = { up: [], right: [], down: [], left: [], reset: [] }; for (const [f, k] of r.events) L[KEY[k]].push(f);
     const STOP = +process.env.BSTOPCP || 0;
     const v = STOP ? await (async () => { await sim.initFast(); const q = await sim.evalFrom(L, 0, 300000, 0, STOP); return { frames: q.cp >= STOP ? q.frames : Infinity }; })()
-      : await sim.run(encodeRecording(L), 300000);
+      : await (async () => { const q = await sim.run(encodeRecording(L), 300000); return { frames: q.frames < 300000 ? q.frames : Infinity }; })();   // hitting the cap = did not finish
     console.log(`${r.name}: beam finish ${r.finish}, clean re-simulation ${v.frames}`);
     if (!best || v.frames < best.frames) best = { ...r, frames: v.frames };
     for (const [i, a] of (r.alts || []).entries()) {

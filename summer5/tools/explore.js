@@ -209,7 +209,7 @@ if (process.argv[2] === 'child') {
       // re-check without snapshots: the finish via the game's recording path; a section goal by
       // replaying until the checkpoint is collected
       const v = STOPCP ? await (async () => { await sim.initFast(); const q = await sim.evalFrom(L, 0, MAX_T + 10000, 0, STOPCP); return { frames: q.cp >= STOPCP ? q.frames : Infinity }; })()
-        : await sim.run(encodeRecording(L), MAX_T + 10000);
+        : await (async () => { const q = await sim.run(encodeRecording(L), MAX_T + 10000); return { frames: q.frames < MAX_T + 10000 ? q.frames : Infinity }; })();   // hitting the cap = did not finish
       console.log(`${r.name}: search ${STOPCP ? 'checkpoint ' + STOPCP : 'finish'} ${r.finish}, clean re-simulation ${v.frames}`);
       fs.writeFileSync(outFile.replace(/\.json$/, `_${r.name}.json`), JSON.stringify(r.events));
       if (!best || v.frames < best.frames) best = { ...r, frames: v.frames };
