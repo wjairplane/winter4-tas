@@ -8,10 +8,10 @@
 // Patches PolyTrack's physics worker so it applies the recorded inputs on exact
 // 1 ms simulation frames. Load Winter 4, then press W once to start; the TAS
 // takes over (further real key presses are ignored by the car).
-// Leaderboard submission is blocked while this script is enabled (set
-// ALLOW_SUBMIT to true to change that).
+// Finished runs are submitted to the leaderboard as usual (set ALLOW_SUBMIT
+// to false to block submission).
 (() => {
-  const ALLOW_SUBMIT = false;
+  const ALLOW_SUBMIT = true;
   const SCHED = /*SCHED*/[];
   const ANCHOR = "for(;t.userControls.buffer.length>0&&t.userControls.buffer[0].frame<=t.frames;){";
 

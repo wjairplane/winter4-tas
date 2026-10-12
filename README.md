@@ -33,9 +33,9 @@ the game loads, so install it as a userscript:
 
 Turn the script off to play normally again (while it's on it drives every track you load).
 
-**Leaderboard:** the userscript blocks leaderboard submission (`ALLOW_SUBMIT = false`
-at the top of the script). The game then shows "Failed to connect to server" after the
-finish. That's expected.
+**Leaderboard:** the userscript submits finished runs to the leaderboard as usual
+(`ALLOW_SUBMIT = true` at the top of the script). Set it to `false` to block submission;
+the game then shows "Failed to connect to server" after the finish.
 
 ## Files
 
@@ -45,7 +45,8 @@ finish. That's expected.
   `python3 tools/build_userscript.py [inputs] [out]`).
 - `tools/fetch_replay.py [rank] [out]` – downloads and decodes a Winter 4 leaderboard recording.
 - `tools/run_headless.js [userscript]` – runs the userscript on Winter 4 in headless Chromium
-  (`npm i playwright`), prints the final time and checkpoints. Submission is blocked.
+  (`npm i playwright`), prints the final time and checkpoints. It always blocks submission (forces
+  `ALLOW_SUBMIT = false` and aborts leaderboard POSTs).
 - `tools/fetch_sim_assets.sh` – downloads the physics worker + wasm and captures the Winter 4
   track messages into `sim_assets/` for the offline simulator (`tools/sim.js`).
 - `tools/evolve.js`, `optimize*.js`, `beam.js`, `segment.js` – search tools from summer1-tas,

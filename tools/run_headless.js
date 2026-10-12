@@ -1,16 +1,17 @@
 // Runs the TAS on Winter 4 in headless Chromium (needs: npm i playwright).
 // usage: node tools/run_headless.js [userscript=tas-exact.user.js] [screenshot=result.png]
-const { chromium } = require('playwright'), path = require('path');
+const { chromium } = require('playwright'), path = require('path'), fs = require('fs');
 const script = path.resolve(process.argv[2] || path.join(__dirname, '..', 'tas-exact.user.js')), shot = process.argv[3] || 'result.png';
 const TRACK = 'Winter 4';
 (async () => {
   const b = await chromium.launch({ args: ['--use-angle=swiftshader','--use-gl=angle','--enable-unsafe-swiftshader','--ignore-gpu-blocklist','--no-sandbox'] });
   const p = await b.newPage({ viewport: { width: 1280, height: 720 } });
-  // never submit TAS runs to the online leaderboard (the userscript blocks this too)
+  // never submit test runs to the online leaderboard: force the userscript's own block on,
+  // and abort any submission that still reaches the network
   let blocked = 0;
   await p.route(/vps\.kodub\.com\/.*\/(leaderboard|verifyRecordings)(\?|$)/, r => r.request().method() === 'POST' ? (blocked++, r.abort()) : r.continue());
   p.on('console', msg => { if (msg.text().startsWith('[TAS]')) console.log(msg.text()); });
-  await p.addInitScript({ path: script });
+  await p.addInitScript({ content: fs.readFileSync(script, 'utf8').replace('const ALLOW_SUBMIT = true;', 'const ALLOW_SUBMIT = false;') });
   await p.goto('https://app-polytrack.kodub.com/0.6.3/', { waitUntil: 'load' });
   await p.waitForTimeout(6000);
   const ok = p.getByText('Ok', { exact: true }); if (await ok.count()) await ok.first().click();
