@@ -1,6 +1,6 @@
 // Injected into PolyTrack's physics worker (same scope as its message handler) by tools/sim.js.
 // Gives a single-car simulator with heap snapshots so runs can resume mid-way.
-const __S={snaps:new Map(),K:1000,zero:null};
+const __S={snaps:new Map(),K:4000,zero:null};   // K: snapshot every K frames (Summer 5 is ~108k frames; 4000 keeps memory near 1 GB per worker)
 const __KEYS=["up","right","down","left","reset"];
 function __pos(b){const v=new DataView(b);const u=new Uint8Array(b);const o=(u[11]&2)?17:14;return[v.getFloat32(o,!0),v.getFloat32(o+4,!0),v.getFloat32(o+8,!0)]}
 function __quat(b){const u=new Uint8Array(b),v=new DataView(b),o=((u[11]&2)?17:14)+12;return[v.getFloat32(o,!0),v.getFloat32(o+4,!0),v.getFloat32(o+8,!0),v.getFloat32(o+12,!0)]}
