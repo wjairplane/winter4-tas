@@ -134,7 +134,7 @@ async function beamChild(cfg, refFile) {
       const adv = nd.t - nd.parent.t, vr0 = Math.max(5, V[Math.min(V.length - 1, Math.round(nd.parent.refT))] || 5), fast = Math.max(1, Math.abs(r.speed) / vr0), pr = project(r.pos, nd.parent.refT + 0.3 * adv, nd.parent.refT + 1.7 * adv * fast + 5);   // a car much faster than the reference here covers more of its line per step
       if (process.env.BTRACE && nd.parent === prevTop && (!topKid || pr.refT > topKid.refT)) topKid = { refT: pr.refT, off: pr.off, dy: pr.dy, speed: r.speed, cp: r.cp, pos: r.pos, t: nd.t };
       if (pr.off > DEAD_OFF) { why.off++; return; }
-      if (pr.dy < -8 || pr.dy > 80) { why.dy++; return; }             // well below the track = fell off; far above = flying (allowed)
+      if (pr.dy < -(+process.env.BDYMIN || 8) || pr.dy > 80) { why.dy++; return; }   // well below the track = fell off (BDYMIN m, default 8); far above = flying (allowed)
       if (pr.refT < nd.t - 1500) { why.slow++; return; }              // left the course / hopelessly slow
       // a state that is past a reference checkpoint position (with margin) but has not collected it skipped it
       if (nd.cp < C[Math.max(0, Math.min(C.length - 1, Math.floor(pr.refT) - 30))]) { why.cp++; return; }
