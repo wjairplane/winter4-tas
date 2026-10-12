@@ -10,15 +10,19 @@ https://www.kodub.com/apps/polytrack, game version 0.6.3. Built the same way as
 - #1 **19.311s** SpeedySebas (2026-07-22), #2 19.380 xtuov, #3/#4 19.383 Swirls / The Kroger,
   #5 19.388 LanceB_YT. The #1 run is 69 ms clear of everyone else.
 
-## Result: 19.308s
+## Result: 19.298s
 
-`tas-exact.user.js` finishes Winter 4 in **19.308s**, 3 ms faster than the #1 run (19.311s).
-Verified in the real game (headless Chromium, submission blocked): `00:19.308`, 4/4 checkpoints.
+`tas-exact.user.js` finishes Winter 4 in **19.298s**, 13 ms faster than the #1 run (19.311s).
+Verified in the real game (headless Chromium, submission blocked): `00:19.298`, 4/4 checkpoints.
+`tas-replay.user.js` replays the unmodified #1 run (19.311s, 4/4).
 
-Found with `tools/evolve.js` seeded from the #1 run, in under a minute. It changed two
-inputs: the brake (S) tap at 12.723s now starts at 12.707s, and the right-steer (D) tap at
-18.313s now starts at 18.305s. The search was stopped at the first time under 19.311.
-`tas-replay.user.js` replays the unmodified #1 run (also verified: 19.311s, 4/4).
+### Improvement log
+
+| Cycle | Method | Time |
+|---|---|---|
+| 0 | #1 leaderboard run (SpeedySebas) replayed | 19.311 |
+| 0 | `evolve.js` seeded from #1, stopped at first gain (S tap 16 ms earlier, D tap 8 ms earlier) | 19.308 |
+| 1 | `evolve.js`, ~35 min total from 19.308 (41 reference updates) | 19.298 |
 
 ## Use
 
