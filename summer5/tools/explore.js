@@ -15,7 +15,7 @@
 //    frame, default all of them) and grows the search from there.
 //  - STOPCP=k makes collecting checkpoint k the goal instead of the finish (one section at a
 //    time); the result is the inputs up to the earliest arrival, and <out>.t holds that frame.
-// usage: [CONFIGS=a,b] [NK=4] [MAX_T=ms] [START=file[:frame]] [STOPCP=k] node tools/explore.js [out=inputs/summer5_explore.json]
+// usage: [CONFIGS=a,b] [NK=4] [MAX_T=ms] [START=file[:frame]] [STOPCP=k] [EMP=map.json] [CRASHPEN=m per km/h] node tools/explore.js [out=inputs/summer5_explore.json]
 const { fork } = require('child_process'), fs = require('fs'), path = require('path');
 const { createSim, encodeRecording } = require('./sim.js');
 const NAME = { up: 'KeyW', right: 'KeyD', down: 'KeyS', left: 'KeyA' };
@@ -165,6 +165,12 @@ async function child(cfg) {
       const pp = nd.parent.pos, dt = Math.max(1, nd.t - nd.parent.t);
       const head = pp ? Math.round(Math.atan2(r.pos[0] - pp[0], r.pos[2] - pp[2]) / (Math.PI / 8)) : 0;
       nd.score = score(nd.cp, r.pos, r.speed);
+      // CRASHPEN: a sudden loss of speed that is not braking (>15 km/h in one step, S not held) is a
+      // wall hit; each line carries its total and pays CRASHPEN metres per km/h lost, so the search
+      // prefers braking for a corner over using the wall as a brake
+      const ps = nd.parent.speed ?? r.speed, braking = nd.segs.some(([b]) => b & 4), drop = ps - r.speed;
+      nd.crash = (nd.parent.crash || 0) + (!braking && drop > 15 ? drop : 0);
+      nd.score -= (+process.env.CRASHPEN || 0) * nd.crash;
       nd.cell = cellOf(nd.cp, r.pos); nd.coarse = nd.cell + '|' + head;
       const fk = nd.cp + ':' + r.pos.map(x => Math.round(x / 0.4)).join(',') + '|' + Math.round(Math.atan2(r.pos[0] - (pp || r.pos)[0], r.pos[2] - (pp || r.pos)[2]) / 0.05) + '|' + Math.round(r.speed / 3);
       const c = fine.get(fk); if (!c || nd.score > c.score) fine.set(fk, nd);
