@@ -28,6 +28,11 @@ const CONFIGS = [
   { name: 'e50', BLOCK: 50, K: 200, CELL: 5, NOV: 8, ACTIONS: [1, 9, 3, 8, 2, 0, 4] },
   { name: 'e30', BLOCK: 30, K: 130, CELL: 4, NOV: 6, ACTIONS: [1, 9, 3, 0, 4] },
   { name: 'e60', BLOCK: 60, K: 240, CELL: 6, NOV: 10, ACTIONS: [1, 9, 3, 8, 2, 0, 4, 13, 7] },
+  // variants of e60 (the setting that found the 1:20.057 route)
+  { name: 'e50w', BLOCK: 50, K: 260, CELL: 6, NOV: 10, ACTIONS: [1, 9, 3, 8, 2, 0, 4, 13, 7] },
+  { name: 'e70', BLOCK: 70, K: 260, CELL: 6, NOV: 10, ACTIONS: [1, 9, 3, 8, 2, 0, 4, 13, 7] },
+  { name: 'e60w', BLOCK: 60, K: 340, CELL: 5, NOV: 10, ACTIONS: [1, 9, 3, 8, 2, 0, 4, 13, 7] },
+  { name: 'e40w', BLOCK: 40, K: 240, CELL: 5, NOV: 10, ACTIONS: [1, 9, 3, 8, 2, 0, 4, 13, 7] },
 ];
 
 // Distance along the track to each target: every drivable part is a node (centre = grid * 5 m),
