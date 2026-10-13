@@ -106,7 +106,20 @@ async function child(cfg) {
 
   const visits = new Map();
   const cellOf = (cp, p) => cp + ':' + Math.floor(p[0] / CELL) + ',' + Math.floor(p[1] / CELL) + ',' + Math.floor(p[2] / CELL);
-  const score = (cp, p, v) => cp * 1e5 - Math.min(5e4, F.dist(Math.min(cp, NCP), p)) + Math.max(0, v) / 3.6 * 0.3;
+  // EMP=<navmesh.json> (tools/navmesh.js): score by the fastest known time-to-go from where the car
+  // is, along routes our own runs have driven (as metres at 50 m/s); off those routes, fall back to
+  // the track-graph distance with a 20 s-equivalent penalty
+  const EMP = process.env.EMP ? JSON.parse(fs.readFileSync(process.env.EMP)) : null;
+  const empDist = (k, p) => {
+    const f = EMP.fields[k]; if (!f) return null; const C = EMP.cell, cx = Math.floor(p[0] / C), cy = Math.floor(p[1] / C), cz = Math.floor(p[2] / C);
+    let best = Infinity;
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (let c = -1; c <= 1; c++) {
+      const v = f[(cx + a) + ',' + (cy + b) + ',' + (cz + c)]; if (v !== undefined) { const d = v + 300 * (Math.abs(a) + Math.abs(b) + Math.abs(c)); if (d < best) best = d; }
+    }
+    return best < Infinity ? best * 0.05 : null;    // frames -> metres at 50 m/s
+  };
+  const toGo = (k, p) => { if (EMP) { const e = empDist(k, p); if (e !== null) return e; return 1000 + F.dist(k, p); } return F.dist(k, p); };
+  const score = (cp, p, v) => cp * 1e5 - Math.min(5e4, toGo(Math.min(cp, NCP), p)) + Math.max(0, v) / 3.6 * 0.3;
   let beam = [{ id: 0, t: 0, pos: null, cp: 0, parent: null, segs: null }];
   if (process.env.START) {
     const [file, upTo] = process.env.START.split(':'), saved = JSON.parse(fs.readFileSync(file));
