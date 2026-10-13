@@ -9,11 +9,12 @@ the leaderboard was only looked at for the time to beat.
 - 8 checkpoints (taken in order), 1,444,439 verified leaderboard entries.
 - #1 **49.858s** Wak3son (2026-10-07), #2 49.872 SpeedySebas, #3 49.894 youngfella.
 
-## Result: 1:48.283
+## Result: 1:20.057
 
-`tas-exact.user.js` finishes Summer 5 in **1:48.283**. Verified in the real game (headless
-Chromium, submission blocked): `01:48.283`, 8/8 checkpoints. It is a first, unoptimized
-route: about twice the #1 time. Improvement cycles come next.
+`tas-exact.user.js` finishes Summer 5 in **1:20.057**. Verified in the real game (headless
+Chromium, submission blocked): `01:20.057`, 8/8 checkpoints. The #1 time is 49.858s, so this
+is still about 30 s off, but 28 s faster than the first route.
+`tas-first-route.user.js` is the first from-scratch route (1:48.375).
 
 ### How it was found
 
@@ -33,6 +34,8 @@ route: about twice the #1 time. Improvement cycles come next.
 |---|---|---|
 | 0 | explore.js from the start + tunnel random search + explore.js to the finish | 1:48.375 |
 | 1 | `evolve.js`, 30 min (19 reference updates) | 1:48.283 |
+| 2 | beam search guided by the 1:48.283 run, and section-by-section search: faster checkpoint times (e.g. checkpoint 6 at 66.0 s vs 77.3 s) but no faster full lap | — |
+| 3 | route map from all 85 of our own saved runs (`tools/navmesh.js`), then `explore.js EMP=...` from the start, scored by the fastest known time-to-go | **1:20.057** |
 
 ## Use
 
@@ -45,7 +48,9 @@ It submits finished runs to the leaderboard (`ALLOW_SUBMIT = true`); set it to `
 
 ## Files
 
-- `inputs/summer5.json` – the first run (1:48.375); `inputs/summer5_opt.json` – the current best (`[frame_ms, key, pressed]`).
+- `inputs/summer5.json` – the first run (1:48.375); `inputs/summer5_opt.json` – the current best, 1:20.057 (`[frame_ms, key, pressed]`).
+- `inputs/sections/` – faster lines to individual checkpoints found along the way.
+- `tools/navmesh.js` – builds the route map from saved runs; `tools/shoot.js` – random-input search toward a point.
 - `tas-exact.user.js` – built from `tas-exact.template.js` by `python3 tools/build_userscript.py`.
 - `tools/fetch_sim_assets.sh` – physics worker + wasm and Summer 5 track messages into `sim_assets/`.
 - `tools/explore.js` – the from-scratch search (`START`, `MAX_T`, `CONFIGS` options; saves the
