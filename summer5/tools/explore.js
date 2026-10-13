@@ -33,6 +33,11 @@ const CONFIGS = [
   { name: 'e70', BLOCK: 70, K: 260, CELL: 6, NOV: 10, ACTIONS: [1, 9, 3, 8, 2, 0, 4, 13, 7] },
   { name: 'e60w', BLOCK: 60, K: 340, CELL: 5, NOV: 10, ACTIONS: [1, 9, 3, 8, 2, 0, 4, 13, 7] },
   { name: 'e40w', BLOCK: 40, K: 240, CELL: 5, NOV: 10, ACTIONS: [1, 9, 3, 8, 2, 0, 4, 13, 7] },
+  // variants of e70 (round 1 winner, 1:05.112)
+  { name: 'e80', BLOCK: 80, K: 260, CELL: 6, NOV: 10, ACTIONS: [1, 9, 3, 8, 2, 0, 4, 13, 7] },
+  { name: 'e75', BLOCK: 75, K: 300, CELL: 6, NOV: 10, ACTIONS: [1, 9, 3, 8, 2, 0, 4, 13, 7] },
+  { name: 'e70w', BLOCK: 70, K: 360, CELL: 5, NOV: 10, ACTIONS: [1, 9, 3, 8, 2, 0, 4, 13, 7] },
+  { name: 'e65', BLOCK: 65, K: 280, CELL: 7, NOV: 10, ACTIONS: [1, 9, 3, 8, 2, 0, 4, 13, 7] },
 ];
 
 // Distance along the track to each target: every drivable part is a node (centre = grid * 5 m),
